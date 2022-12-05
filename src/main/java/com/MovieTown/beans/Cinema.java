@@ -18,6 +18,7 @@ public class Cinema {
     private int numOfRows;
     private int numOfColumns;
 
+    //The hallId represents the number of the cinema in the cinema's city
     private int hallId;
     @OneToMany(mappedBy = "cinema", cascade = CascadeType.REMOVE)
     @JsonIgnore
