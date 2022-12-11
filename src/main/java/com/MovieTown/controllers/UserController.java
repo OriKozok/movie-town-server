@@ -182,7 +182,7 @@ public class UserController {
      * @param request a client's request
      * @return a list of seats or an error message if something's wrong (the client isn't a user)
      */
-    @GetMapping(path = "/screenings/seats/{genre}")
+    @GetMapping(path = "/screenings/seats/{id}")
     public ResponseEntity<?> getSeatsOfScreening(@PathVariable int id, HttpServletRequest request){
         try{
         UserService userService= ifAuthorized(request);
