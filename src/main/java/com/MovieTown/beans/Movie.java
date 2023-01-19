@@ -18,13 +18,13 @@ public class Movie {
     private int id;
     //@Column(nullable = false)
     private String name;
+
+    @Column(columnDefinition = "MEDIUMTEXT")
+    private String image;
     @Enumerated(value = EnumType.STRING)
     //@Column(nullable = false)
     private Genre genre;
     private String description;
-
-    //@Column(columnDefinition = "MEDIUMTEXT")
-    //private String image;
     private int duration;//in minutes
     @OneToMany(mappedBy = "movie", cascade = CascadeType.REMOVE)
     @JsonIgnore
@@ -50,6 +50,14 @@ public class Movie {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getImage() {
+        return image;
+    }
+
+    public void setImage(String image) {
+        this.image = image;
     }
 
     public Genre getGenre() {

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import javax.persistence.*;
 import java.util.Date;
-import java.util.Objects;
 
 @Entity
 @Table(name = "seats")
@@ -12,14 +11,14 @@ public class Seat {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int id;
+    private long id;
 
-    private boolean isReserved;
+    private boolean reserved;
     private int row;
     private int column;
     @ManyToOne(fetch=FetchType.EAGER)
     private Screening screening;
-    @ManyToOne(cascade = CascadeType.DETACH)
+    @ManyToOne(cascade = CascadeType.REMOVE)
     @JsonIgnore
     private Order order;
 
@@ -30,31 +29,22 @@ public class Seat {
         this.row = row;
         this.column = column;
         this.screening = screening;
+        this.reserved = false;
     }
 
-    @PreRemove
-    private void UpdateOrderStatus(){
-        if(this.order != null) {
-            if (this.screening.getTime().getTime() < new Date(System.currentTimeMillis()).getTime())
-                this.order.setWatchedPaid();
-            else
-                this.order.setCancelled();
-        }
-    }
-
-    public int getId() {
+    public long getId() {
         return id;
     }
 
     public boolean isReserved() {
-        return isReserved;
+        return reserved;
     }
 
     public void setReserved() {
-        isReserved = true;
+        reserved = true;
     }
 
-    public void setFree(){isReserved = false;}
+    public void setFree(){reserved = false;}
 
     public int getRow() {
         return row;
@@ -92,7 +82,7 @@ public class Seat {
     public String toString() {
         return "Seat{" +
                 "id=" + id +
-                ", isReserved=" + isReserved +
+                ", isReserved=" + reserved +
                 ", row=" + row +
                 ", column=" + column +
                 ", screening=" + screening +

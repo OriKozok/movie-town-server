@@ -46,6 +46,6 @@ public class TokenFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         String path = request.getRequestURI();
-        return path.startsWith("/guest") && !path.startsWith("/guest/out");
+        return path.startsWith("/client") && !path.startsWith("/client/out");
     }
 }

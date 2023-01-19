@@ -6,23 +6,18 @@ import com.MovieTown.repositories.*;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
-import javax.persistence.RollbackException;
-import javax.transaction.Transactional;
 import java.util.*;
 
 @Service
 @Scope("prototype")
 public class UserService extends ClientService implements Registered{
-
-    private SeatRepository seatRepository;
     private UserRepository userRepository;
     private OrderRepository orderRepository;
     private int userId;
 
-    public UserService(MovieRepository movieRepository, ScreeningRepository screeningRepository, CinemaRepository cinemaRepository,
-                       UserRepository userRepository, SeatRepository seatRepository, UserRepository userRepository1, OrderRepository orderRepository) {
-        super(movieRepository, screeningRepository, cinemaRepository, userRepository);
-        this.seatRepository = seatRepository;
+    public UserService(MovieRepository movieRepository, ScreeningRepository screeningRepository, CinemaRepository cinemaRepository, UserRepository userRepository,
+                       SeatRepository seatRepository, UserRepository userRepository1, OrderRepository orderRepository) {
+        super(movieRepository, screeningRepository, cinemaRepository,seatRepository, userRepository);
         this.userRepository = userRepository1;
         this.orderRepository = orderRepository;
     }
@@ -76,7 +71,10 @@ public class UserService extends ClientService implements Registered{
      * @param id an Screening id
      * @return a list of the screening's seats corresponding to the given id
      */
-    public List<Seat> getSeatsOfScreening(int id){//works
+    public List<Seat> getSeatsOfScreening(int id) throws NoSuchScreeningException, ScreeningWasScreenedException {
+        Screening screening = screeningRepository.findById(id).orElseThrow(NoSuchScreeningException::new);
+        if(screening.getTime().getTime() < new Date().getTime())
+            throw new ScreeningWasScreenedException();
         return this.seatRepository.findByScreeningId(id);
     }
 
@@ -85,7 +83,11 @@ public class UserService extends ClientService implements Registered{
      * @return a list of the user's orders
      */
     public List<Order> getUserOrders(){
-        return this.orderRepository.findByUserId(this.userId);
+        List<Order> orders = this.orderRepository.findByUserId(this.userId);
+        for(Order order : orders){
+            order.setSeats(seatRepository.findByOrderId(order.getId()));
+        }
+        return orders;
     }
 
     /***
@@ -100,26 +102,26 @@ public class UserService extends ClientService implements Registered{
 
     /***
      * This method receives a list of seats, creates an order with those seats and adds it to the DB
-     * @param seatsId al ist of seats ids
+     * @param seats al ist of Seat objects
      * @return an Order object
      * @throws SeatIsReservedException if the selected seats are reserved for another order
      * @throws NoSuchUserException if there's no user with the service's userId
      * @throws InvalidSeatsException if the seats are not in the same row or not in executive columns
      */
-    public Order addOrder(List<Integer> seatsId) throws SeatIsReservedException, NoSuchUserException, InvalidSeatsException, NoSuchSeatException {
-        //seats must be in the same row and have executive columns
-        List<Seat> seats = new LinkedList<>();
-        for(int seatId: seatsId){
-            Seat seat = seatRepository.findById(seatId).orElseThrow(NoSuchSeatException::new);
-            seats.add(seat);
-        }
-        seats.sort(Comparator.comparing(Seat::getColumn));
-        int row = seats.get(0).getRow();
-        for (int i = 1; i < seats.size(); i++){
-            if(seats.get(i).getRow() != row || seats.get(i).getColumn() != seats.get(i-1).getColumn() +1)
-                throw new InvalidSeatsException();
-            if(seats.get(i).isReserved())
-                throw new SeatIsReservedException();
+    public Order addOrder(List<Seat> seats) throws SeatIsReservedException, NoSuchUserException, InvalidSeatsException, NoSuchSeatException {
+        if(seats.size() == 0)
+            throw new NoSuchSeatException();
+        if(seats.get(0).isReserved())
+            throw new SeatIsReservedException();
+        if(seats.size() > 1){
+            seats.sort(Comparator.comparing(Seat::getColumn));
+            int row = seats.get(0).getRow();
+            for (int i = 1; i < seats.size(); i++){
+                if(seats.get(i).getRow() != row || seats.get(i).getColumn() != seats.get(i-1).getColumn() +1)
+                    throw new InvalidSeatsException();
+                if(seats.get(i).isReserved())
+                    throw new SeatIsReservedException();
+                }
         }
         User user = getDetails();
         Order order = new Order(user, seats);
@@ -127,10 +129,8 @@ public class UserService extends ClientService implements Registered{
         for(Seat seat : seats){
             seat.setReserved();
             seat.setOrder(order);
-            System.out.println(seat);
             seatRepository.save(seat);
         }
-        System.out.println(order);
         return order;
     }
 
@@ -144,17 +144,17 @@ public class UserService extends ClientService implements Registered{
      */
     public String cancelOrder(int id) throws NoSuchOrderException, OrderCancellationException, UnauthorizedException {
         Order order = orderRepository.findById(id).orElseThrow(NoSuchOrderException::new);
-        if(order.getId() != this.userId)
+        if(order.getUser().getId() != this.userId)
             throw new UnauthorizedException();
-        if(order.getStatus() == Status.CANCELLED || order.getStatus() == Status.PAID_WATCHED)
+        if(order.getStatus() == Status.PAID_WATCHED)
             throw new OrderCancellationException();
+        System.out.println(order);
         for(Seat seat : order.getSeats()){
             seat.setFree();
             seat.setOrder(null);
             seatRepository.save(seat);
         }
-        order.setCancelled();
-        orderRepository.save(order);
+        orderRepository.deleteById(id);
         return "Order cancelled";
     }
 

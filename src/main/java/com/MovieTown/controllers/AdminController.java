@@ -3,6 +3,7 @@ package com.MovieTown.controllers;
 import com.MovieTown.beans.*;
 import com.MovieTown.exceptions.*;
 import com.MovieTown.services.AdminService;
+import com.MovieTown.services.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -53,7 +54,7 @@ public class AdminController {
             return ResponseEntity.ok(adminService.updateMovie(movie));
         }catch (UnauthorizedException e){
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
-        } catch (Exception e) {
+        } catch (NoSuchMovieException | InvalidMovieUpdateException | MovieExistsException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
@@ -230,7 +231,8 @@ public class AdminController {
             return ResponseEntity.ok(adminService.updateScreening(screening));
         }catch (UnauthorizedException e){
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
-        } catch (Exception e) {
+        } catch (NoSuchScreeningException | InvalidScreeningUpdateException | UnavailableTimeException e) {
+            System.out.println(e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
@@ -339,6 +341,24 @@ public class AdminController {
     }
 
     /***
+     * This method receives a screening's id and returns a list of its seats
+     * @param id a screening id
+     * @param request a client's request
+     * @return a list of seats or an error message if something's wrong (the client isn't a user)
+     */
+    @GetMapping(path = "/screenings/seats/{id}")
+    public ResponseEntity<?> getSeatsOfScreening(@PathVariable int id, HttpServletRequest request){
+        try{
+            AdminService adminService = ifAuthorized(request);
+            return  ResponseEntity.ok(adminService.getSeatsOfScreening(id));
+        } catch (UnauthorizedException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
+        } catch (NoSuchScreeningException | ScreeningWasScreenedException e) {
+            return ResponseEntity.status(404).body(e.getMessage());
+        }
+    }
+
+    /***
      * This method returns a list of all the users in the DB
      * @param request a client's request
      * @return a list of all the users in the DB or an error message if something's wrong (the client isn't an admin)
@@ -368,6 +388,21 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(404).body(e.getMessage());
+        }
+    }
+
+    /***
+     * This method returns a list of all the orders in the DB
+     * @param request a client's request
+     * @return a list of all the orders in the DB or an error message if something's wrong (the client isn't an admin)
+     */
+    @GetMapping(path = "/orders")
+    public ResponseEntity<?> getAllOrders(HttpServletRequest request){
+        try{
+            AdminService adminService = ifAuthorized(request);
+            return  ResponseEntity.ok(adminService.getAllOrders());
+        }catch (UnauthorizedException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
         }
     }
 

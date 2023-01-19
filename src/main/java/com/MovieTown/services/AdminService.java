@@ -3,6 +3,7 @@ package com.MovieTown.services;
 import com.MovieTown.beans.*;
 import com.MovieTown.exceptions.*;
 import com.MovieTown.repositories.*;
+import org.aspectj.weaver.ast.Or;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -10,14 +11,12 @@ import java.util.stream.Collectors;
 
 @Service
 public class AdminService extends ClientService implements Registered{
-
-    private SeatRepository seatRepository;
     private UserRepository userRepository;
     private OrderRepository orderRepository;
 
     public AdminService(MovieRepository movieRepository, ScreeningRepository screeningRepository, CinemaRepository cinemaRepository,
                         UserRepository userRepository, SeatRepository seatRepository, UserRepository userRepository1, OrderRepository orderRepository) {
-        super(movieRepository, screeningRepository, cinemaRepository, userRepository);
+        super(movieRepository, screeningRepository, cinemaRepository,seatRepository, userRepository);
         this.seatRepository = seatRepository;
         this.userRepository = userRepository1;
         this.orderRepository = orderRepository;
@@ -42,6 +41,8 @@ public class AdminService extends ClientService implements Registered{
     public Movie addMovie(Movie movie) throws MovieExistsException {
         if(movieRepository.existsById(movie.getId()) || movieRepository.findAll().stream().anyMatch(m -> m.getName().equals(movie.getName())))
             throw new MovieExistsException();
+        movie.setName(movie.getName().toUpperCase());
+        movie.setDescription(movie.getDescription().toUpperCase().charAt(0)+movie.getDescription().substring(1));//Make description start with capital letter
         return movieRepository.save(movie);
     }
 
@@ -52,10 +53,12 @@ public class AdminService extends ClientService implements Registered{
      * @throws NoSuchMovieException if there's no movie in the DB with that id
      * @throws InvalidMovieUpdateException if the received movie's name doesn't match the one in the DB
      */
-    public Movie updateMovie(Movie movie) throws NoSuchMovieException, InvalidMovieUpdateException {
+    public Movie updateMovie(Movie movie) throws NoSuchMovieException, InvalidMovieUpdateException, MovieExistsException {
         Movie movie1 = movieRepository.findById(movie.getId()).orElseThrow(NoSuchMovieException::new);
         if(!movie.getName().equals(movie1.getName()))
             throw new InvalidMovieUpdateException();
+        if(movieRepository.findAll().stream().anyMatch(m -> m.getName().equals(movie.getName()) && movie.getId() != m.getId()))
+            throw new MovieExistsException();
         return movieRepository.save(movie);
     }
 
@@ -156,10 +159,12 @@ public class AdminService extends ClientService implements Registered{
         List<Screening> screenings = screeningRepository.findByCinemaId(screening.getCinema().getId());
         long startScreening = screening.getTime().getTime();
         long endScreening = startScreening + (screening.getMovie().getDuration()* 60000L);//60000L is 1 minute in long
-        if(screenings.stream().anyMatch(s -> checkScreeningsTime(startScreening, endScreening, s)))
+        //There are 2 options for InvalidTimeException: 1. The screening time is not available
+        // 2. Because the screening's time is in the past
+        if(screenings.stream().anyMatch(s -> checkScreeningsTime(startScreening, endScreening, s)) || screening.getTime().getTime() < new Date().getTime())
             throw new UnavailableTimeException();
-        List<Seat> seats = new LinkedList<>();
         screening = screeningRepository.save(screening);
+        List<Seat> seats = new LinkedList<>();
         Cinema cinema = screening.getCinema();
         for(int i = 1; i <= cinema.getNumOfRows(); i++){
             for(int j = 1; j <= cinema.getNumOfColumns(); j++){
@@ -185,19 +190,25 @@ public class AdminService extends ClientService implements Registered{
         Screening s = screeningRepository.findById(screening.getId()).orElseThrow(NoSuchScreeningException::new);
         List<Seat> screeningSeats = screening.getSeats();
         List<Seat> sSeats = s.getSeats();
-        if(screeningSeats.size() != sSeats.size())
-            throw new InvalidScreeningUpdateException();
-        for(int i = 0; i < screeningSeats.size(); i++){
-            if(!screeningSeats.get(i).equals(sSeats.get(i)))
+        if(screening.getSeats() != null){
+            if (screeningSeats.size() != sSeats.size())
                 throw new InvalidScreeningUpdateException();
+            for (int i = 0; i < screeningSeats.size(); i++) {
+                if (!screeningSeats.get(i).equals(sSeats.get(i)))
+                    throw new InvalidScreeningUpdateException();
+            }
         }
-        if((screening.getMovie().getId() != s.getMovie().getId()) || (screening.getCinema().getId() != s.getCinema().getId())){
+        if ((screening.getMovie().getId() != s.getMovie().getId()) || (screening.getCinema().getId() != s.getCinema().getId())) {
             throw new InvalidScreeningUpdateException();
         }
         List<Screening> screenings = screeningRepository.findByCinemaId(screening.getCinema().getId());
+        System.out.println(screenings);
         long screeningTime = screening.getTime().getTime();
-        long endScreening = screeningTime + (screening.getMovie().getDuration()* 60000L);//60000L is 1 minute in long
-        if(screenings.stream().anyMatch(scr-> checkScreeningsTime(screeningTime, endScreening, scr)))
+        long endScreening = screeningTime + (screening.getMovie().getDuration() * 60000L);//60000L is 1 minute in long
+        //There are 2 options for InvalidTimeException: 1. The screening time is not available (unless it's because the same one who is not up-to-date)
+        // 2. Because the screening's time is in the past
+        if (screenings.stream().anyMatch(scr -> scr.getId() != screening.getId() && checkScreeningsTime(screeningTime, endScreening, scr))
+                || screening.getTime().getTime() < new Date().getTime())
             throw new UnavailableTimeException();
         return screeningRepository.save(screening);
     }
@@ -237,6 +248,14 @@ public class AdminService extends ClientService implements Registered{
     }
 
     /***
+     * This method returns a list of all the orders in the DB
+     * @return a list of Order objects
+     */
+    public List<Order> getAllOrders(){
+        return orderRepository.findAll();
+    }
+
+    /***
      * This method checks if there's a screening from DB which runs during the one that is added/updated
      * @param startScreening the added/updated screening's start time
      * @param endScreening the added/updated screening's start time
@@ -244,12 +263,13 @@ public class AdminService extends ClientService implements Registered{
      * @return true if the screening's time is good na false if not
      */
     private boolean checkScreeningsTime(long startScreening, long endScreening, Screening s){
-        //1. screening is before current date
-        //2. screening starts before the one from the DB but ends during it
-        //3. screening starts during the one from the DB
+        //1. screening starts before the one from the DB but ends during it
+        //2. screening starts during the one from the DB
         long startS = s.getTime().getTime();
         long endS =  startS + (s.getMovie().getDuration()* 60000L);
-        return startScreening < new Date().getTime() || (startS > startScreening && startS < endScreening) || (startS < startScreening && endS > startScreening);
+        boolean temp = (startS > startScreening && startS < endScreening) || (startS < startScreening && endS > startScreening);
+        System.out.println(temp);
+        return temp;
     }
 
     @Override

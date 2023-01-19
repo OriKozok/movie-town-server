@@ -21,6 +21,8 @@ public class ScreeningDeleteJob implements Runnable{
         this.seatRepository = seatRepository;
     }
 
+
+
     public void stop() {
         quit = true;
     }

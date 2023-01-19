@@ -189,6 +189,8 @@ public class UserController {
         return  ResponseEntity.ok(userService.getSeatsOfScreening(id));
         } catch (UnauthorizedException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
+        } catch (NoSuchScreeningException | ScreeningWasScreenedException e) {
+            return ResponseEntity.status(404).body(e.getMessage());
         }
     }
 
@@ -227,19 +229,18 @@ public class UserController {
 
     /***
      * This method receives a list of seats' ids and add an order to the DB with those seats
-     * @param seatsId a list of seats' ids
+     * @param seats a list of seats
      * @param request a client's request
      * @return an Order object or an error message if something's wrong (the client isn't a user or the service wasn't able to add)
      */
     @PostMapping(path = "/orders")
-    public ResponseEntity<?> addOrder(@RequestBody List<Integer> seatsId, HttpServletRequest request){
+    public ResponseEntity<?> addOrder(@RequestBody List<Seat> seats, HttpServletRequest request){
         try {
             UserService userService= ifAuthorized(request);
-            return ResponseEntity.ok(userService.addOrder(seatsId));
+            return ResponseEntity.ok(userService.addOrder(seats));
         }catch (UnauthorizedException e){
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
-        } catch (SeatIsReservedException | NoSuchUserException | InvalidSeatsException |
-                 NoSuchSeatException e) {
+        } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
@@ -257,7 +258,7 @@ public class UserController {
             return ResponseEntity.ok(userService.cancelOrder(id));
         }catch (UnauthorizedException e){
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
-        } catch (Exception e) {
+        } catch (NoSuchOrderException | OrderCancellationException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

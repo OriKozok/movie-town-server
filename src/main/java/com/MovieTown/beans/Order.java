@@ -1,6 +1,6 @@
 package com.MovieTown.beans;
 
-import com.sun.istack.NotNull;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.persistence.*;
 import java.util.List;
@@ -18,7 +18,6 @@ public class Order {
     //3 Status modes:
     //1.Paid not watched: for upcoming screenings
     //2.Paid watched: for past screenings
-    //3.Cancelled: for orders cancelled by the user or the movie/cinema/screening was deleted
     private Status status;
 
     @OneToMany(mappedBy = "order", fetch = FetchType.EAGER)
@@ -29,14 +28,10 @@ public class Order {
     public Order(User user, List<Seat> seats){
         this.user = user;
         this.seats = seats;
-    }
-    public Order(){}
-
-    @PrePersist
-    private void add() {
         this.price = seats.size() * 15;
         this.status = Status.PAID_NOT_WATCHED;
     }
+    public Order(){}
 
     public int getId() {
         return id;
@@ -69,8 +64,6 @@ public class Order {
     public Status getStatus() {
         return status;
     }
-
-    public void setCancelled(){this.status = Status.CANCELLED;}
 
     public void setWatchedPaid(){this.status=Status.PAID_WATCHED;
     }

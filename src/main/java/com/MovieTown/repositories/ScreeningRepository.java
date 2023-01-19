@@ -14,5 +14,7 @@ public interface ScreeningRepository extends JpaRepository<Screening, Integer> {
 
     public List<Screening> findByMovieId(int id);
 
+    public List<Screening> findByMovieIdAndTimeGreaterThan(int id, Date time);
+
     public List<Screening> findByTimeLessThan(Date time);
 }

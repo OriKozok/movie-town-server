@@ -1,7 +1,6 @@
 package com.MovieTown.beans;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.sun.istack.NotNull;
 
 import javax.persistence.*;
 import java.util.List;

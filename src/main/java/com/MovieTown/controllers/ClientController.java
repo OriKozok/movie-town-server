@@ -15,18 +15,17 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 
+//Controller for clients who are not logged in
 @RestController
-@RequestMapping("/guest")
-public class GuestController {
-
-    //private sessions
-
-    private GuestService guestService;
+@RequestMapping("/client")
+public class ClientController {
     private HashMap<String, MySession> sessions;
+
+    private ClientService clientService;
     private final ApplicationContext applicationContext;
 
-    public GuestController(GuestService guestService, HashMap<String, MySession> sessions, ApplicationContext applicationContext) {
-        this.guestService = guestService;
+    public ClientController(ClientService clientService, HashMap<String, MySession> sessions, ApplicationContext applicationContext) {
+        this.clientService = clientService;
         this.sessions = sessions;
         this.applicationContext = applicationContext;
     }
@@ -41,7 +40,7 @@ public class GuestController {
     @PostMapping("/register")
     public ResponseEntity<String> register(@RequestBody User user){
         try {
-            user = guestService.register(user);
+            user = clientService.register(user);
             System.out.println(user);
             String token = createNewUserToken(user);
             UserService userService = applicationContext.getBean(UserService.class).login(user.getEmail(), user.getPassword());
@@ -101,7 +100,7 @@ public class GuestController {
      */
     @GetMapping(path = "/movies")
     public List<Movie> getAllMovies(){
-            return guestService.getAllMovies();
+            return clientService.getAllMovies();
     }
 
     /***
@@ -112,10 +111,21 @@ public class GuestController {
     @GetMapping(path = "/movies/{id}")
     public ResponseEntity<?> getMovieById(@PathVariable int id){
         try {
-            return ResponseEntity.ok(guestService.getMovieById(id));
+            return ResponseEntity.ok(clientService.getMovieById(id));
         } catch (NoSuchMovieException e) {
             return ResponseEntity.status(404).body(e.getMessage());
         }
+    }
+
+    /***
+     * This method returns a list of movies that have screenings in the given city
+     * @param city a string representing a city in which there are screenings
+     * @return a list of movies that have screenings in the given city
+     */
+    @GetMapping(path = "/movies/city/{city}")
+    public ResponseEntity<?> getMoviesByCity(@PathVariable String city)
+    {
+            return ResponseEntity.ok(clientService.getMoviesByCity(city));
     }
 
     /***
@@ -124,7 +134,7 @@ public class GuestController {
      */
     @GetMapping(path = "/screenings")
     public List<Screening> getAllScreenings(){
-        return guestService.getAllScreenings();
+        return clientService.getAllScreenings();
     }
 
     /***
@@ -135,7 +145,7 @@ public class GuestController {
     @GetMapping(path = "/screenings/{id}")
     public ResponseEntity<?> getScreeningById(@PathVariable int id){
         try {
-            return ResponseEntity.ok(guestService.getScreeningById(id));
+            return ResponseEntity.ok(clientService.getScreeningById(id));
         } catch (NoSuchScreeningException e) {
             return ResponseEntity.status(404).body(e.getMessage());
         }
@@ -147,8 +157,8 @@ public class GuestController {
      * @return a list of screenings whose movie id corresponds to the given one
      */
     @GetMapping(path = "/screenings/movie/{id}")
-    public List<Screening> getAllScreeningsByMovie(int id){
-            return guestService.getScreeningsByMovieId(id);
+    public List<Screening> getAllScreeningsByMovie(@PathVariable int id){
+            return clientService.getScreeningsByMovieId(id);
     }
 
     /***
@@ -158,7 +168,7 @@ public class GuestController {
      */
     @GetMapping(path = "/screenings/city/{city}")
     public List<Screening> getScreeningsByCity(@PathVariable String city){
-        return guestService.getScreeningsByCity(city);
+        return clientService.getScreeningsByCity(city);
     }
 
     /***
@@ -168,7 +178,22 @@ public class GuestController {
      */
     @GetMapping(path = "/screenings/genre/{genre}")
     public List<Screening> getScreeningsByGenre(@PathVariable Genre genre){
-        return guestService.getScreeningsByGenre(genre);
+        return clientService.getScreeningsByGenre(genre);
+    }
+
+    /***
+     * This method receives a screening's id and returns a list of its seats
+     * @param id a screening id
+     * @param request a client's request
+     * @return a list of seats or an error message if something's wrong (the client isn't a user)
+     */
+    @GetMapping(path = "/screenings/seats/{id}")
+    public ResponseEntity<?> getSeatsOfScreening(@PathVariable int id, HttpServletRequest request){
+        try{
+            return  ResponseEntity.ok(clientService.getSeatsOfScreening(id));
+        } catch (NoSuchScreeningException | ScreeningWasScreenedException e) {
+            return ResponseEntity.status(404).body(e.getMessage());
+        }
     }
 
     /***
